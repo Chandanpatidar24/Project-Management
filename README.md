@@ -94,9 +94,9 @@ npm run dev
 
 ---
 
-## 📸 Screenshots
+<!-- ## 📸 Screenshots
 
-*(Add screenshots of your Dashboard, Project Details, and Task Modal here)*
+*(Add screenshots of your Dashboard, Project Details, and Task Modal here)* -->
 
 ---
 
