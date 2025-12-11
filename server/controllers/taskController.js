@@ -20,35 +20,41 @@ const createTask = async (req, res) => {
         return res.status(401).json({ message: 'Not authorized' });
     }
 
-    let assignedTo = null;
+    let assignedToIds = [];
     if (assignedToEmail) {
-        // Try finding by email first
-        let userToAssign = await User.findOne({ email: assignedToEmail });
+        // Split by comma and trim to handle multiple inputs usually sent as string "user1, user2"
+        const emailsOrUsernames = assignedToEmail.split(',').map(e => e.trim());
 
-        // If not found, try finding by username
-        if (!userToAssign) {
-            userToAssign = await User.findOne({ username: assignedToEmail });
-        }
+        for (const identifier of emailsOrUsernames) {
+            if (!identifier) continue;
 
-        if (userToAssign) {
-            assignedTo = userToAssign._id;
+            // Try finding by email first
+            let userToAssign = await User.findOne({ email: identifier });
 
-            // Auto-add to project members if not already
-            const isMember = project.members.some(m => m.user.toString() === userToAssign._id.toString());
-            if (!isMember) {
-                project.members.push({ user: userToAssign._id, role: 'Member' });
-                await project.save();
+            // If not found, try finding by username
+            if (!userToAssign) {
+                userToAssign = await User.findOne({ username: identifier });
+            }
 
-                // Notify about Project Invite
-                await Notification.create({
-                    recipient: userToAssign._id,
-                    sender: req.user._id,
-                    type: 'INVITE',
-                    message: `You have been added to project "${project.title}"`,
-                    relatedId: project._id,
-                });
+            if (userToAssign) {
+                assignedToIds.push(userToAssign._id);
+
+                // Auto-add to project members if not already
+                const isMember = project.members.some(m => m.user.toString() === userToAssign._id.toString());
+                if (!isMember) {
+                    project.members.push({ user: userToAssign._id, role: 'Member' });
+                    // Notify about Project Invite
+                    await Notification.create({
+                        recipient: userToAssign._id,
+                        sender: req.user._id,
+                        type: 'INVITE',
+                        message: `You have been added to project "${project.title}"`,
+                        relatedId: project._id,
+                    });
+                }
             }
         }
+        if (assignedToIds.length > 0) await project.save();
     }
 
     const task = await Task.create({
@@ -57,17 +63,20 @@ const createTask = async (req, res) => {
         deadline,
         projectId,
         createdBy: req.user._id,
-        assignedTo,
+        assignedTo: assignedToIds,
     });
 
-    if (assignedTo) {
-        await Notification.create({
-            recipient: assignedTo,
-            sender: req.user._id,
-            type: 'ASSIGNMENT',
-            message: `You have been assigned to task "${task.title}"`,
-            relatedId: task._id,
-        });
+    // Notify all assignees
+    if (assignedToIds.length > 0) {
+        for (const recipientId of assignedToIds) {
+            await Notification.create({
+                recipient: recipientId,
+                sender: req.user._id,
+                type: 'ASSIGNMENT',
+                message: `You have been assigned to task "${task.title}"`,
+                relatedId: task._id,
+            });
+        }
     }
 
     res.status(201).json(task);
@@ -175,7 +184,7 @@ const updateTaskStatus = async (req, res) => {
 
     // Check permission: Owner or Assigned User
     const isOwner = task.createdBy.toString() === req.user._id.toString();
-    const isAssigned = task.assignedTo && task.assignedTo.toString() === req.user._id.toString();
+    const isAssigned = task.assignedTo && task.assignedTo.some(id => id.toString() === req.user._id.toString());
 
     if (!isOwner && !isAssigned) {
         return res.status(401).json({ message: 'Not authorized' });
@@ -183,16 +192,25 @@ const updateTaskStatus = async (req, res) => {
 
     // Owner can update everything (via details page), Assigned can only update Status
     if (isOwner) {
-        task.status = req.body.status || task.status;
-        task.deadline = req.body.deadline || task.deadline;
-        task.title = req.body.title || task.title;
-        task.description = req.body.description || task.description;
+        if (req.body.status) task.status = req.body.status;
+        if (req.body.deadline !== undefined) task.deadline = req.body.deadline;
+        if (req.body.title) task.title = req.body.title;
+        if (req.body.description) task.description = req.body.description;
+
+
+
     } else {
         task.status = req.body.status || task.status;
     }
 
     await task.save();
-    res.json(task);
+
+    // Populate before returning for UI updates
+    const updatedTask = await Task.findById(task._id)
+        .populate('assignedTo', 'username email')
+        .populate('comments.user', 'username');
+
+    res.json(updatedTask);
 };
 
 

@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, Clock, X, User } from 'lucide-react';
+import { ArrowLeft, Clock, MessageSquare, CheckCircle, Search, X, User } from 'lucide-react';
 import Layout from '../components/Layout';
 import api from '../api';
+import { useToast } from '../context/ToastContext';
+import { getDaysLeft } from '../utils';
 
 const AssignedTasks = () => {
     const [tasks, setTasks] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
     const [selectedTask, setSelectedTask] = useState(null);
+    const [statusUpdating, setStatusUpdating] = useState(false);
+    const { success, error } = useToast();
 
     useEffect(() => {
         const fetchTasks = async () => {
@@ -14,6 +20,8 @@ const AssignedTasks = () => {
                 setTasks(data);
             } catch (error) {
                 console.error("Failed to fetch assigned tasks", error);
+            } finally {
+                setLoading(false);
             }
         };
         fetchTasks();
@@ -23,15 +31,17 @@ const AssignedTasks = () => {
         e.stopPropagation(); // Prevent opening modal when clicking status button
         try {
             const newStatus = currentStatus === 'Pending' ? 'Completed' : 'Pending';
-            await api.put(`/tasks/${taskId}`, { status: newStatus });
+            const { data } = await api.put(`/tasks/${taskId}`, { status: newStatus });
             // Optimistic update
-            setTasks(tasks.map(t => t._id === taskId ? { ...t, status: newStatus } : t));
+            setTasks(tasks.map(t => t._id === taskId ? data : t));
             if (selectedTask && selectedTask._id === taskId) {
-                setSelectedTask({ ...selectedTask, status: newStatus });
+                setSelectedTask(data);
             }
-        } catch (error) {
-            alert('Failed to update status');
-        }
+            success(`Task marked as ${newStatus}`);
+        } catch (err) {
+            console.error("Failed to update status", err);
+            error("Failed to update status");
+        } finally { };
     };
 
     return (
@@ -41,7 +51,11 @@ const AssignedTasks = () => {
                 <p className="text-gray-500 dark:text-gray-400 mt-1">Tasks assigned to you by team members</p>
             </div>
 
-            {tasks.length === 0 ? (
+            {loading ? (
+                <div className="text-center py-20">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                </div>
+            ) : tasks.length === 0 ? (
                 <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
                     <p className="text-gray-500 dark:text-gray-400">No tasks assigned to you yet.</p>
                 </div>
@@ -132,8 +146,8 @@ const AssignedTasks = () => {
                                 <button
                                     onClick={(e) => handleStatusUpdate(e, selectedTask._id, selectedTask.status)}
                                     className={`flex-1 py-3 rounded-xl font-bold text-white transition ${selectedTask.status === 'Pending'
-                                            ? 'bg-green-600 hover:bg-green-700'
-                                            : 'bg-orange-500 hover:bg-orange-600'
+                                        ? 'bg-green-600 hover:bg-green-700'
+                                        : 'bg-orange-500 hover:bg-orange-600'
                                         }`}
                                 >
                                     {selectedTask.status === 'Pending' ? 'Mark as Completed' : 'Mark as Pending'}

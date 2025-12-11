@@ -2,17 +2,19 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { User, Mail, Lock, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const Register = () => {
     const [formData, setFormData] = useState({ username: '', email: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
     const { register } = useAuth();
+    const { error } = useToast();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         const result = await register(formData.username, formData.email, formData.password);
         if (!result.success) {
-            alert(result.message);
+            error(result.message);
         }
     };
 

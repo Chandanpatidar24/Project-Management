@@ -6,13 +6,16 @@ import { BrowserRouter } from 'react-router-dom'
 
 import { AuthProvider } from './context/AuthContext.jsx'
 import { UIProvider } from './context/UIContext';
+import { ToastProvider } from './context/ToastContext';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
         <BrowserRouter>
             <AuthProvider>
                 <UIProvider>
-                    <App />
+                    <ToastProvider>
+                        <App />
+                    </ToastProvider>
                 </UIProvider>
             </AuthProvider>
         </BrowserRouter>

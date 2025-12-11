@@ -2,18 +2,20 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, CheckCircle } from 'lucide-react'; // Ensure package installed or remove if not needed
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const Login = () => {
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
     const { login } = useAuth();
+    const { error } = useToast();
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         const result = await login(formData.email, formData.password);
         if (!result.success) {
-            alert(result.message);
+            error(result.message);
         }
     };
 

@@ -71,10 +71,10 @@ const Header = () => {
             {/* Left logic: Logo or Toggle + Search */}
             <div className="flex items-center gap-6">
                 <div className="w-64 flex-shrink-0 flex items-center gap-2">
-                    <button onClick={toggleSidebar} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg md:hidden">
+                    <button onClick={toggleSidebar} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">
                         <Menu size={24} />
                     </button>
-                    <span className="font-bold text-xl text-blue-600 hidden md:block">ProManage</span>
+                    <span className={`font-bold text-xl text-blue-600 hidden md:block transition-opacity duration-300 ${!toggleSidebar ? 'opacity-0' : 'opacity-100'}`}>ProManage</span>
                 </div>
 
                 <div className="flex items-center gap-4 bg-gray-50 px-4 py-2.5 rounded-full w-96">

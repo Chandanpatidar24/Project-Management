@@ -28,10 +28,10 @@ const taskSchema = mongoose.Schema({
         required: true,
         ref: 'User',
     },
-    assignedTo: {
-        type: mongoose.Schema.Types.ObjectId, // Assigned Collaborator
-        ref: 'User', // Can be null initially if not assigned?
-    },
+    assignedTo: [{
+        type: mongoose.Schema.Types.ObjectId, // Assigned Collaborators
+        ref: 'User',
+    }],
     comments: [{
         text: String,
         user: {

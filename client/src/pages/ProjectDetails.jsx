@@ -4,6 +4,7 @@ import { Plus, Users, Calendar, CheckCircle, Search, UserPlus, MessageSquare, Cl
 import Layout from '../components/Layout';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { getDaysLeft } from '../utils';
 
 const ProjectDetails = () => {
@@ -60,9 +61,10 @@ const ProjectDetails = () => {
             await api.post('/tasks', { ...newTask, projectId: id });
             setShowTaskModal(false);
             setNewTask({ title: '', description: '', deadline: '', assignedToEmail: '' });
+            success('Task Created');
             fetchProjectData();
-        } catch (error) {
-            alert('Failed to create task');
+        } catch (err) {
+            error('Failed to create task');
         }
     };
 
@@ -73,8 +75,9 @@ const ProjectDetails = () => {
             setShowMemberModal(false);
             setNewMemberEmail('');
             fetchProjectData();
-        } catch (error) {
-            alert(error.response?.data?.message || 'Failed to add member');
+            success('Member Added');
+        } catch (err) {
+            error(err.response?.data?.message || 'Failed to add member');
         }
     };
 
@@ -86,20 +89,28 @@ const ProjectDetails = () => {
             setSelectedTask(data);
             setTasks(tasks.map(t => t._id === data._id ? data : t));
             setCommentText('');
-        } catch (error) {
+            success('Comment Added');
+        } catch (err) {
             console.error("Failed to add comment");
+            error("Failed to add comment");
         }
     };
+
+    const { success, error } = useToast();
 
     const handleUpdateTask = async () => {
         if (!selectedTask) return;
         try {
-            const { data } = await api.put(`/tasks/${selectedTask._id}`, editTaskData);
+            // Ensure deadline is undefined or null if empty string, to prevent bug
+            const payload = { ...editTaskData };
+            if (payload.deadline === '') payload.deadline = null;
+
+            const { data } = await api.put(`/tasks/${selectedTask._id}`, payload);
             setSelectedTask(data);
             setTasks(tasks.map(t => t._id === data._id ? data : t));
-            alert('Task Updated');
-        } catch (error) {
-            alert('Failed to update task');
+            success('Task Updated Successfully');
+        } catch (err) {
+            error('Failed to update task');
         }
     };
 
@@ -110,10 +121,13 @@ const ProjectDetails = () => {
             await api.delete(`/tasks/${selectedTask._id}`);
             setTasks(tasks.filter(t => t._id !== selectedTask._id));
             setSelectedTask(null);
-        } catch (error) {
-            alert('Failed to delete task');
+            success('Task Deleted');
+        } catch (err) {
+            error('Failed to delete task');
         }
     };
+
+
 
     const handleUpdateProject = async (e) => {
         e.preventDefault();
@@ -121,8 +135,9 @@ const ProjectDetails = () => {
             const { data } = await api.put(`/projects/${id}`, editProjectData);
             setProject(data);
             setShowProjectSettings(false);
-        } catch (error) {
-            alert('Failed to update project');
+            success('Project Updated');
+        } catch (err) {
+            error('Failed to update project');
         }
     };
 
@@ -130,9 +145,11 @@ const ProjectDetails = () => {
         if (!window.confirm("Are you sure you want to delete this PROJECT? This action cannot be undone.")) return;
         try {
             await api.delete(`/projects/${id}`);
+            await api.delete(`/projects/${id}`);
+            success('Project Deleted');
             navigate('/dashboard');
-        } catch (error) {
-            alert('Failed to delete project');
+        } catch (err) {
+            error('Failed to delete project');
         }
     };
 
@@ -155,35 +172,38 @@ const ProjectDetails = () => {
         <Layout>
             {/* Header Section */}
             <div className="mb-8">
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{project?.title}</h1>
                         <p className="text-gray-500 dark:text-gray-400 mt-1">{project?.description}</p>
                     </div>
                     {isOwner && (
-                        <div className="flex gap-3">
+                        <div className="flex gap-2">
                             <button
                                 onClick={() => setShowProjectSettings(true)}
-                                className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition font-medium"
+                                className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition font-medium"
+                                title="Settings"
                             >
                                 <Settings size={18} />
-                                Settings
+                                <span className="hidden md:inline">Settings</span>
                             </button>
                             {activeTab === 'members' ? (
                                 <button
                                     onClick={() => setShowMemberModal(true)}
-                                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
+                                    className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition"
+                                    title="Invite Member"
                                 >
                                     <UserPlus size={18} />
-                                    Invite Member
+                                    <span className="hidden md:inline">Invite</span>
                                 </button>
                             ) : (
                                 <button
                                     onClick={() => setShowTaskModal(true)}
-                                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                                    className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition"
+                                    title="Add Task"
                                 >
                                     <Plus size={18} />
-                                    Add Task
+                                    <span className="hidden md:inline">Add Task</span>
                                 </button>
                             )}
                         </div>
@@ -240,30 +260,31 @@ const ProjectDetails = () => {
                             <div
                                 key={task._id}
                                 onClick={() => openTaskDetails(task)}
-                                className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 hover:shadow-md transition flex items-center justify-between cursor-pointer"
+                                className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 hover:shadow-md transition flex flex-col sm:flex-row sm:items-center justify-between cursor-pointer gap-4"
                             >
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-3 h-3 rounded-full ${task.status === 'Completed' ? 'bg-green-500' : 'bg-orange-500'}`} />
+                                <div className="flex items-start gap-4">
+                                    <div className={`w-3 h-3 rounded-full mt-1.5 ${task.status === 'Completed' ? 'bg-green-500' : 'bg-orange-500'}`} />
                                     <div>
                                         <h3 className={`font-bold text-gray-900 dark:text-white ${task.status === 'Completed' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
                                             {task.title}
                                         </h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">{task.description}</p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{task.description}</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                                    <div className="font-bold text-orange-600 dark:text-orange-400 text-xs">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-500 dark:text-gray-400 pl-7 sm:pl-0">
+                                    <div className="font-bold text-orange-600 dark:text-orange-400 text-xs flex items-center gap-2">
+                                        <Clock size={14} className="sm:hidden" />
                                         {getDaysLeft(task.deadline)}
                                     </div>
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-2 sm:gap-1">
                                         <MessageSquare size={14} />
-                                        {task.comments?.length || 0}
+                                        {task.comments?.length || 0} <span className="sm:hidden">Comments</span>
                                     </div>
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-2 sm:gap-1">
                                         <Calendar size={14} />
                                         {task.deadline && task.deadline.split('T')[0]}
                                     </div>
-                                    <span className={`px-2 py-1 rounded-md text-xs font-bold ${task.status === 'Completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'}`}>
+                                    <span className={`px-2 py-1 rounded-md text-xs font-bold w-fit ${task.status === 'Completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'}`}>
                                         {task.status}
                                     </span>
                                 </div>
@@ -274,32 +295,55 @@ const ProjectDetails = () => {
                         )}
                     </div>
                 </div>
-            ) : (
+            ) : null}
+
+            {/* Team Members List */}
+            {activeTab === 'members' ? (
                 <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
-                    <table className="w-full text-left">
-                        <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700">
-                            <tr>
-                                <th className="px-6 py-4 font-semibold text-gray-700 dark:text-gray-300">Member</th>
-                                <th className="px-6 py-4 font-semibold text-gray-700 dark:text-gray-300">Email</th>
-                                <th className="px-6 py-4 font-semibold text-gray-700 dark:text-gray-300">Role</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                            {project?.members?.map((member) => (
-                                <tr key={member._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{member.user?.username || 'Unknown'}</td>
-                                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{member.user?.email}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold ${member.role === 'Admin' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'}`}>
+                    {/* Desktop Headers */}
+                    <div className="hidden md:grid grid-cols-3 p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-300">
+                        <div>Member</div>
+                        <div>Email</div>
+                        <div>Role</div>
+                    </div>
+
+                    <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                        {project?.members?.map((member) => (
+                            <div key={member._id} className="p-4 md:grid md:grid-cols-3 md:items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition flex flex-col gap-2">
+                                {/* Mobile-Optimized Layout */}
+                                <div className="flex md:block items-center justify-between">
+                                    <span className="md:hidden text-xs font-bold text-gray-400 uppercase tracking-wide">Member</span>
+                                    <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs">
+                                            {member.user?.username?.[0]?.toUpperCase() || 'U'}
+                                        </div>
+                                        {member.user?.username || 'Unknown'}
+                                    </div>
+                                </div>
+
+                                <div className="flex md:block items-center justify-between">
+                                    <span className="md:hidden text-xs font-bold text-gray-400 uppercase tracking-wide">Email</span>
+                                    <div className="text-gray-500 dark:text-gray-400 text-sm truncate">
+                                        {member.user?.email}
+                                    </div>
+                                </div>
+
+                                <div className="flex md:block items-center justify-between">
+                                    <span className="md:hidden text-xs font-bold text-gray-400 uppercase tracking-wide">Role</span>
+                                    <div>
+                                        <span className={`px-2 py-1 rounded text-xs font-bold inline-block ${member.role === 'Admin' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'}`}>
                                             {member.role}
                                         </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {project?.members?.length === 0 && (
+                        <p className="text-center py-8 text-gray-500">No members yet.</p>
+                    )}
                 </div>
-            )}
+            ) : null}
 
             {/* Task Details & Comments Modal */}
             {selectedTask && (
@@ -325,7 +369,22 @@ const ProjectDetails = () => {
                                 <h3 className="font-bold text-gray-900 dark:text-white mb-2">Details</h3>
                                 <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300 mb-6">
                                     <p><strong>Deadline:</strong> {selectedTask.deadline ? selectedTask.deadline.split('T')[0] : 'None'} <span className="text-orange-600 dark:text-orange-400 ml-2">({getDaysLeft(selectedTask.deadline)})</span></p>
-                                    <p><strong>Assigned To:</strong> {selectedTask.assignedTo ? (selectedTask.assignedTo.username || 'User ID: ' + selectedTask.assignedTo) : 'Unassigned'}</p>
+
+                                    <div>
+                                        <strong>Assigned To:</strong>
+                                        <div className="mt-1 flex flex-wrap gap-2">
+                                            {selectedTask.assignedTo && (Array.isArray(selectedTask.assignedTo) ? selectedTask.assignedTo : [selectedTask.assignedTo]).map((assignee, idx) => (
+                                                assignee && (
+                                                    <span key={assignee._id || idx} className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
+                                                        {assignee.username || 'Unknown'}
+                                                    </span>
+                                                )
+                                            ))}
+                                            {(!selectedTask.assignedTo || (Array.isArray(selectedTask.assignedTo) && selectedTask.assignedTo.length === 0)) && (
+                                                <span className="text-gray-400 italic">Unassigned</span>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {isOwner && (
@@ -442,7 +501,7 @@ const ProjectDetails = () => {
                             />
                             <input
                                 type="text"
-                                placeholder="Assign to (Username or Email) - Optional"
+                                placeholder="Assign to (Usernames/Emails comma separated)"
                                 className="w-full p-3 border rounded-xl dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                                 value={newTask.assignedToEmail} onChange={e => setNewTask({ ...newTask, assignedToEmail: e.target.value })}
                             />
